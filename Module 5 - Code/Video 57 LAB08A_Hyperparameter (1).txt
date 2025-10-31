@@ -1,0 +1,32 @@
+from azure.ai.ml.sweep import Uniform, Choice
+# Define trial command job
+job = command(
+    code=".", # Folder containing train2.py
+    command="python train2.py --learning_rate ${{inputs.learning_rate}} --batch_size ${{inputs.batch_size}}",
+    inputs={
+	 "learning_rate": Uniform(0.001, 0.1),
+ 	 "batch_size": Choice([16, 32, 64])
+    },
+    environment="AzureML-sklearn-1.0-ubuntu20.04-py38-cpu:1",
+    compute="AzureDP100CI",
+    experiment_name="sweep-exp",
+    display_name="trial-job"
+)
+
+# Define sweep job using job.sweep (NOT trial.sweep)
+sweep_job = job.sweep(
+    sampling_algorithm="random",
+    search_space={
+	"learning_rate": Uniform(0.001, 0.1),
+	"batch_size": Choice([16, 32, 64])
+    },
+    compute="AzureDP100CI",
+    max_total_trials=10,
+    max_concurrent_trials=2,
+    primary_metric="accuracy",
+    goal="maximize",
+)
+
+# Submit the job
+returned_job = ml_client.jobs.create_or_update(sweep_job)
+ml_client.jobs.stream(returned_job.name)
